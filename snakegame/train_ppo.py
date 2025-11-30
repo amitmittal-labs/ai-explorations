@@ -199,13 +199,6 @@ def evaluate_agent(agent: PPOAgent, env: SnakeEnv, num_episodes: int = 5, render
 
 
 def play_trained_model(model_path: str = "snake_ppo_model_final.pt", episodes: int = 5):
-    """
-    Watch the trained model play (inference only - uses policy network only)
-    
-    Args:
-        model_path: Path to saved model
-        episodes: Number of episodes to watch
-    """
     print("=" * 60)
     print(f"Loading model: {model_path}")
     print("=" * 60)
@@ -221,7 +214,7 @@ def play_trained_model(model_path: str = "snake_ppo_model_final.pt", episodes: i
     agent = PPOAgent(state_dim=state_dim, action_dim=action_dim)
     
     # Load model (inference only - just policy network)
-    agent.load(model_path, inference_only=True)
+    agent.load(model_path)
     
     print(f"Watching trained agent play {episodes} episodes...")
     print("Close the window to stop early")

@@ -10,18 +10,10 @@ class RewardCalculator:
     
     def __init__(
         self,
-        food_reward: float = 10.0,
-        death_penalty: float = -10.0,
-        step_penalty: float = -0.01
+        food_reward: float = 75.0,
+        death_penalty: float = -25.0,
+        step_penalty: float = -10
     ):
-        """
-        Initialize reward calculator
-        
-        Args:
-            food_reward: Reward for eating food
-            death_penalty: Penalty for dying
-            step_penalty: Small penalty per step (encourages efficiency)
-        """
         self.food_reward = food_reward
         self.death_penalty = death_penalty
         self.step_penalty = step_penalty
@@ -32,17 +24,6 @@ class RewardCalculator:
         self_hit: bool,
         had_food: bool
     ):
-        """
-        Calculate reward based on game state
-        
-        Args:
-            done: Whether episode ended
-            self_hit: Whether snake hit itself
-            had_food: Whether snake ate food this step
-        
-        Returns:
-            reward: Calculated reward value
-        """
         reward = 0.0
         
         # Step penalty for alive steps
@@ -75,21 +56,10 @@ class SnakeEnv(gym.Env):
         render_mode=None, 
         width=20, 
         height=15,
-        food_reward: float = 10.0,
-        death_penalty: float = -10.0,
-        step_penalty: float = -0.01
+        food_reward: float = 75.0,
+        death_penalty: float = -25.0,
+        step_penalty: float = -10
     ):
-        """
-        Initialize Snake environment
-        
-        Args:
-            render_mode: "human" for visualization, None for training
-            width: Game width
-            height: Game height
-            food_reward: Reward for eating food
-            death_penalty: Penalty for dying
-            step_penalty: Penalty per step
-        """
         super().__init__()
 
         self.width = width
@@ -135,15 +105,6 @@ class SnakeEnv(gym.Env):
         return observation, info
 
     def step(self, action):
-        """
-        Execute one step in the environment
-        
-        Args:
-            action: 0 (straight), 1 (right), or 2 (left)
-        
-        Returns:
-            observation, reward, terminated, truncated, info
-        """
         # Take action in game
         observation, terminated, self_hit, had_food, truncated, info = self.game.take_action(action)
 

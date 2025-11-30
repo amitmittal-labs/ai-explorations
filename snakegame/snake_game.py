@@ -47,8 +47,14 @@ class SnakeGame:
                 return food
 
     def take_action(self, action=None):
+        """
+        Take an action in the game
+        
+        Returns:
+            observation, terminated, self_hit, had_food, truncated, info
+        """
         if self.game_over:
-            return self._get_observation(), 0, True, False, {}
+            return self._get_observation(), True, False, False, False, {"score": self.score}
 
         # Update direction based on action (only for RL mode)
         if action is not None:
@@ -67,26 +73,25 @@ class SnakeGame:
         elif self.direction == Direction.RIGHT:
             new_head = (head_x + 1, head_y)
 
-        # Check collisions
+        # Initialize flags
         terminated = False
-        selfHit = False
-        hadFood = False
+        self_hit = False
+        had_food = False
+        truncated = False
 
         # Wall collision
         if (new_head[0] < 0 or new_head[0] >= self.width or
             new_head[1] < 0 or new_head[1] >= self.height):
             self.game_over = True
             terminated = True
+            return self._get_observation(), terminated, self_hit, had_food, truncated, {"score": self.score}
 
-            return self._get_observation(), terminated, selfHit, hadFood, False, {"score": self.score}
-
-      
         # Self collision
         if new_head in self.snake:
             self.game_over = True
             terminated = True
-            selfHit = True
-            return self._get_observation(), terminated, selfHit, hadFood, False, {"score": self.score}
+            self_hit = True
+            return self._get_observation(), terminated, self_hit, had_food, truncated, {"score": self.score}
 
         # Move snake
         self.snake.insert(0, new_head)
@@ -94,12 +99,12 @@ class SnakeGame:
         # Check food collision
         if new_head == self.food:
             self.score += 1
-            hadFood = True
+            had_food = True
             self.food = self._generate_food()
         else:
             self.snake.pop()  # Remove tail if no food eaten
 
-        return self._get_observation(), terminated, selfHit, hadFood,  False, {"score": self.score}
+        return self._get_observation(), terminated, self_hit, had_food, truncated, {"score": self.score}
 
     def _update_direction(self, action):
         """Update direction based on action"""
