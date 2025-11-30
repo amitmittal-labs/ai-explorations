@@ -189,54 +189,14 @@ class PPOAgent:
             'value_loss': value_loss.item()
         }
     
-    def save(self, filepath: str, save_full: bool = False):
-        """
-        Save model checkpoint
-        
-        Args:
-            filepath: Path to save the model
-            save_full: If True, saves both policy and value networks (for resuming training)
-                      If False, saves only policy network (for inference only)
-        """
-        if save_full:
-            # Save everything (for resuming training)
-            torch.save({
-                'policy_state_dict': self.policy_net.state_dict(),
-                'value_state_dict': self.value_net.state_dict(),
-                'policy_optimizer_state_dict': self.policy_optimizer.state_dict(),
-                'value_optimizer_state_dict': self.value_optimizer.state_dict()
-            }, filepath)
-            print(f"Full model saved to {filepath} (can resume training)")
-        else:
-            # Save only policy network (for inference)
-            torch.save({
-                'policy_state_dict': self.policy_net.state_dict()
-            }, filepath)
-            print(f"Policy model saved to {filepath} (inference only)")
-    
-    def load(self, filepath: str, inference_only: bool = False):
-        """
-        Load model checkpoint
-        
-        Args:
-            filepath: Path to the saved model
-            inference_only: If True, only loads policy network (for playing/evaluation)
-                           If False, loads everything (for resuming training)
-        """
+    def save(self, filepath: str):
+        torch.save({
+            'policy_state_dict': self.policy_net.state_dict()
+        }, filepath)
+        print(f"Policy model saved to {filepath} (inference only)")
+
+    def load(self, filepath: str):
         checkpoint = torch.load(filepath)
-        
         # Always load policy network
         self.policy_net.load_state_dict(checkpoint['policy_state_dict'])
-        
-        if not inference_only:
-            # Load value network and optimizers (for training)
-            if 'value_state_dict' in checkpoint:
-                self.value_net.load_state_dict(checkpoint['value_state_dict'])
-                self.policy_optimizer.load_state_dict(checkpoint['policy_optimizer_state_dict'])
-                self.value_optimizer.load_state_dict(checkpoint['value_optimizer_state_dict'])
-                print(f"Full model loaded from {filepath} (ready for training)")
-            else:
-                print(f"Warning: Only policy network found in {filepath}")
-                print(f"Value network not loaded - cannot resume training")
-        else:
-            print(f"Policy model loaded from {filepath} (inference mode)")
+        print(f"Policy model loaded from {filepath} (inference mode)")

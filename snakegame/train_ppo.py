@@ -16,7 +16,6 @@ def train_ppo(
     n_steps: int = 2048,
     epochs: int = 10,
     render: bool = False,
-    save_freq: int = 50000,
     log_freq: int = 10,
     eval_freq: int = 10000,
     eval_episodes: int = 5,
@@ -25,22 +24,6 @@ def train_ppo(
     death_penalty: float = -10.0,
     step_penalty: float = -0.01
 ):
-    """
-    Train Snake AI with custom PPO implementation
-    
-    Args:
-        total_timesteps: Total number of environment steps
-        n_steps: Number of steps to collect before update
-        epochs: Number of PPO epochs per update
-        render: Whether to render during training
-        save_freq: Save model every N timesteps
-        log_freq: Log training stats every N episodes
-        eval_freq: Evaluate model every N timesteps
-        eval_episodes: Number of episodes for evaluation
-        food_reward: Reward for eating food (env parameter)
-        death_penalty: Penalty for dying (env parameter)
-        step_penalty: Penalty per step (env parameter)
-    """
     print("=" * 60)
     print("Training Snake with Custom PPO Implementation")
     print("=" * 60)
@@ -168,18 +151,9 @@ def train_ppo(
             print(f"  Scores: {eval_scores}")
             print("-" * 60)
             last_eval_timestep = timestep
-        
-        # Save checkpoint (full model for resuming training)
-        if timestep % save_freq == 0:
-            checkpoint_path = f"snake_ppo_checkpoint_{timestep}.pt"
-            agent.save(checkpoint_path, save_full=True)
-    
-    # Final saves
-    # Save full model (for potential resuming/retraining)
-    agent.save("snake_ppo_model_full.pt", save_full=True)
     
     # Save inference-only model (smaller, just policy network)
-    agent.save("snake_ppo_model_final.pt", save_full=False)
+    agent.save("snake_ppo_model_final.pt")
     
     # Final evaluation
     print("\n" + "=" * 60)
@@ -191,8 +165,7 @@ def train_ppo(
     print(f"  Best Score: {max(final_scores)}")
     print(f"  Scores: {final_scores}")
     print()
-    print("Models saved:")
-    print(f"  snake_ppo_model_full.pt    - Full model (for resuming training)")
+    print("Model saved:")
     print(f"  snake_ppo_model_final.pt   - Policy only (for inference)")
     
     env.close()
@@ -201,18 +174,6 @@ def train_ppo(
 
 
 def evaluate_agent(agent: PPOAgent, env: SnakeEnv, num_episodes: int = 5, render: bool = False):
-    """
-    Evaluate agent performance
-    
-    Args:
-        agent: PPO agent to evaluate
-        env: Environment to evaluate in
-        num_episodes: Number of episodes to evaluate
-        render: Whether to render evaluation
-    
-    Returns:
-        List of episode scores
-    """
     scores = []
     
     for episode in range(num_episodes):
