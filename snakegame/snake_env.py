@@ -38,13 +38,14 @@ class RewardCalculator:
             reward += self.food_reward
         
         # Reward for moving closer to food
-        reward += self.distance_reward * pos_change
+        if not done and not had_food:
+            reward += self.distance_reward * pos_change
 
         # Penalty for dying
         if done:
             if self_hit:
                 # Double penalty for hitting self
-                reward += 2 * self.death_penalty
+                reward += 5 * self.death_penalty
             else:
                 # Normal penalty for hitting wall
                 reward += self.death_penalty    
@@ -62,10 +63,10 @@ class SnakeEnv(gym.Env):
         render_mode=None, 
         width=20, 
         height=15,
-        food_reward: float = 75.0,
-        death_penalty: float = -25.0,
-        step_penalty: float = -10,
-        distance_reward: float = 1.0
+        food_reward: float = 100.0,
+        death_penalty: float = -50.0,
+        step_penalty: float = 1.0,
+        distance_reward: float = 5.0
     ):
         super().__init__()
 
