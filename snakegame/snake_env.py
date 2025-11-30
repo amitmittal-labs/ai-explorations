@@ -10,19 +10,22 @@ class RewardCalculator:
     
     def __init__(
         self,
-        food_reward: float = 75.0,
-        death_penalty: float = -25.0,
-        step_penalty: float = -10
+        food_reward: float,
+        death_penalty: float,
+        step_penalty: float,
+        distance_reward: float
     ):
         self.food_reward = food_reward
         self.death_penalty = death_penalty
         self.step_penalty = step_penalty
+        self.distance_reward = distance_reward
     
     def calculate_reward(
         self,
         done: bool,
         self_hit: bool,
-        had_food: bool
+        had_food: bool,
+        pos_change: float
     ):
         reward = 0.0
         
@@ -34,6 +37,9 @@ class RewardCalculator:
         if had_food:
             reward += self.food_reward
         
+        # Reward for moving closer to food
+        reward += self.distance_reward * pos_change
+
         # Penalty for dying
         if done:
             if self_hit:
@@ -58,7 +64,8 @@ class SnakeEnv(gym.Env):
         height=15,
         food_reward: float = 75.0,
         death_penalty: float = -25.0,
-        step_penalty: float = -10
+        step_penalty: float = -10,
+        distance_reward: float = 1.0
     ):
         super().__init__()
 
@@ -73,7 +80,8 @@ class SnakeEnv(gym.Env):
         self.reward_calculator = RewardCalculator(
             food_reward=food_reward,
             death_penalty=death_penalty,
-            step_penalty=step_penalty
+            step_penalty=step_penalty,
+            distance_reward=distance_reward
         )
 
         # Define action and observation space
@@ -106,13 +114,14 @@ class SnakeEnv(gym.Env):
 
     def step(self, action):
         # Take action in game
-        observation, terminated, self_hit, had_food, truncated, info = self.game.take_action(action)
+        observation, terminated, self_hit, had_food, pos_change, truncated, info = self.game.take_action(action)
 
         # Calculate reward using reward calculator
         reward = self.reward_calculator.calculate_reward(
             done=terminated or truncated,
             self_hit=self_hit,
-            had_food=had_food
+            had_food=had_food,
+            pos_change=pos_change
         )
         
         if self.render_mode == "human":

@@ -1,8 +1,3 @@
-"""
-Training script for Snake game using custom PPO implementation
-Rewards are calculated by the environment (snake_env.py)
-"""
-
 import numpy as np
 import torch
 from snake_env import SnakeEnv
