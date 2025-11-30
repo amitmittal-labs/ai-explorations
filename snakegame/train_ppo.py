@@ -15,10 +15,10 @@ def train_ppo(
     eval_freq: int = 10000,
     eval_episodes: int = 5,
     # Environment reward parameters
-    food_reward: float = 100.0,
-    death_penalty: float = -50.0,
-    step_penalty: float = 1,
-    distance_reward: float = 5.0
+    food_reward: float = 500.0,
+    death_penalty: float = -100.0,
+    step_reward: float = 1.0,
+    distance_reward: float = 2.0
 ):
     print("=" * 60)
     print("Training Snake with Custom PPO Implementation")
@@ -30,7 +30,7 @@ def train_ppo(
     print("Environment Reward Parameters:")
     print(f"  Food reward: {food_reward}")
     print(f"  Death penalty: {death_penalty}")
-    print(f"  Step penalty: {step_penalty}")
+    print(f"  Step reward: {step_reward}")
     print(f"  Distance reward: {distance_reward}")
     print("-" * 60)
     
@@ -40,7 +40,7 @@ def train_ppo(
         render_mode=render_mode,
         food_reward=food_reward,
         death_penalty=death_penalty,
-        step_penalty=step_penalty,
+        step_reward=step_reward,
         distance_reward=distance_reward
     )
     
@@ -59,7 +59,7 @@ def train_ppo(
         hidden_dim=128,
         lr_policy=3e-4,
         lr_value=1e-3,
-        gamma=0.99,
+        gamma=0.9999,
         clip_epsilon=0.2,
         value_coef=0.5
     )

@@ -12,12 +12,12 @@ class RewardCalculator:
         self,
         food_reward: float,
         death_penalty: float,
-        step_penalty: float,
+        step_reward: float,
         distance_reward: float
     ):
         self.food_reward = food_reward
         self.death_penalty = death_penalty
-        self.step_penalty = step_penalty
+        self.step_reward = step_reward
         self.distance_reward = distance_reward
     
     def calculate_reward(
@@ -29,9 +29,9 @@ class RewardCalculator:
     ):
         reward = 0.0
         
-        # Step penalty for alive steps
+        # Step reward for alive steps
         if not done: 
-            reward += self.step_penalty
+            reward += self.step_reward
         
         # Reward for eating food
         if had_food:
@@ -63,10 +63,10 @@ class SnakeEnv(gym.Env):
         render_mode=None, 
         width=20, 
         height=15,
-        food_reward: float = 100.0,
-        death_penalty: float = -50.0,
-        step_penalty: float = 1.0,
-        distance_reward: float = 5.0
+        food_reward: float = 500.0,
+        death_penalty: float = -100.0,
+        step_reward: float = 1.0,
+        distance_reward: float = 2.0
     ):
         super().__init__()
 
@@ -81,7 +81,7 @@ class SnakeEnv(gym.Env):
         self.reward_calculator = RewardCalculator(
             food_reward=food_reward,
             death_penalty=death_penalty,
-            step_penalty=step_penalty,
+            step_reward=step_reward,
             distance_reward=distance_reward
         )
 
