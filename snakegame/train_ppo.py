@@ -1,24 +1,24 @@
 import numpy as np
 import torch
 from snake_env import SnakeEnv
-from model import PPOAgent
+from ppo_model import PPOAgent
 import time
 from collections import deque
 
 
 def train_ppo(
-    total_timesteps: int = 500000,
-    n_steps: int = 2048,
-    epochs: int = 10,
+    total_timesteps: int = 500000000,
+    n_steps: int = 4096,
+    epochs: int = 100,
     render: bool = False,
-    log_freq: int = 10,
-    eval_freq: int = 10000,
+    log_freq: int = 1000000,
+    eval_freq: int = 1000000,
     eval_episodes: int = 5,
     # Environment reward parameters
     food_reward: float = 500.0,
     death_penalty: float = -100.0,
-    step_reward: float = 1.0,
-    distance_reward: float = 2.0
+    step_reward: float = 2.0,
+    distance_reward: float = 20.0
 ):
     print("=" * 60)
     print("Training Snake with Custom PPO Implementation")
@@ -133,12 +133,6 @@ def train_ppo(
         
         # Update PPO agent
         update_stats = agent.update(epochs=epochs)
-        
-        if update_stats:
-            print(f"Update at timestep {timestep}")
-            print(f"  Policy Loss: {update_stats['policy_loss']:.4f}")
-            print(f"  Value Loss: {update_stats['value_loss']:.4f}")
-            print("-" * 60)
         
         # Evaluate model
         if timestep - last_eval_timestep >= eval_freq:
