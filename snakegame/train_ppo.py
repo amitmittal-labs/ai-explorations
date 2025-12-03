@@ -1,13 +1,123 @@
 import numpy as np
-import torch
 from snake_env import SnakeEnv
 from ppo_model import PPOAgent
 import time
 from collections import deque
 
+def train_by_episodes(
+    total_episodes: int = 1000000,
+    episodes_per_batch: int = 1000,
+    epochs: int = 50,
+    render: bool = False,
+    log_freq: int = 50000,
+    # Environment reward parameters
+    food_reward: float = 700.0,
+    death_penalty: float = -200.0,
+    step_reward: float = 1.0,
+    distance_reward: float = 25.0
+        
+):
+    # Create environment with reward parameters
+    render_mode = "human" if render else None
+    env = SnakeEnv(
+        render_mode=render_mode,
+        food_reward=food_reward,
+        death_penalty=death_penalty,
+        step_reward=step_reward,
+        distance_reward=distance_reward
+    )
+
+    state_dim = env.observation_space.shape[0]
+    action_dim = env.action_space.n
+    agent = PPOAgent(state_dim, action_dim, hidden_dim=128)
+
+    # Global Stats
+    global_episode_count = 0
+    global_timestep_count = 0
+    start_time = time.time()
+
+    # Metrics
+    recent_scores = deque(maxlen=100)
+    recent_lengths = deque(maxlen=100)
+
+    print(f"🚀 Starting Episode-Based Training")
+    print(f"Total Episodes: {total_episodes} | Batch Size: {episodes_per_batch} eps")
+
+    while global_episode_count < total_episodes:
+
+        # --- Collection Phase (Mini-Batch) ---
+        # We play 'episodes_per_batch' full games before stopping to learn
+        batch_timesteps = 0
+
+        for _ in range(episodes_per_batch):
+            state, _ = env.reset()
+            done = False
+            ep_reward = 0
+            ep_steps = 0
+
+            while not done:
+                action, log_prob, value = agent.select_action(state)
+                next_state, reward, terminated, truncated, info = env.step(action)
+                done = terminated or truncated
+
+                agent.store_transition(state, action, log_prob, reward, value)
+
+                ep_reward += reward
+                ep_steps += 1
+                state = next_state
+
+            # Episode Complete
+            global_episode_count += 1
+            global_timestep_count += ep_steps
+            batch_timesteps += ep_steps
+
+            recent_scores.append(info.get('score', 0))
+            recent_lengths.append(ep_steps)
+
+            if global_episode_count >= total_episodes:
+                break
+
+        # --- Optimization Phase ---
+        # Train on all data collected from the 500 episodes
+        agent.update(epochs=epochs)
+
+        # --- Logging ---
+        elapsed = time.time() - start_time
+        avg_score = np.mean(recent_scores) if recent_scores else 0
+        avg_len = np.mean(recent_lengths) if recent_lengths else 0
+        fps = global_timestep_count / elapsed
+
+        if global_episode_count % log_freq == 0:
+            print(f"Ep {global_episode_count}/{total_episodes} | "
+                f"Steps: {global_timestep_count} | "
+                f"Avg Score: {avg_score:.1f} | "
+                f"Avg Len: {avg_len:.1f} | FPS: {fps:.0f}")
+
+            agent.save(f"snake_ppo_ep{global_episode_count}.pt")
+
+    print("🎉 Training Complete!")
+    # Save inference-only model (smaller, just policy network)
+    agent.save("snake_ppo_model_final.pt")
+    
+    # Final evaluation
+    print("\n" + "=" * 60)
+    print("Training Complete!")
+    print("=" * 60)
+    final_scores = evaluate_agent(agent, env, 20, render=False)
+    print(f"Final Evaluation (20 episodes):")
+    print(f"  Average Score: {np.mean(final_scores):.2f}")
+    print(f"  Best Score: {max(final_scores)}")
+    print(f"  Scores: {final_scores}")
+    print()
+    print("Model saved:")
+    print(f"  snake_ppo_model_final.pt   - Policy only (for inference)")
+    
+    env.close()
+    
+    return agent
 
 def train_ppo(
-    total_timesteps: int = 500000000,
+    total_timesteps: int = 100000000,
     n_steps: int = 4096,
     epochs: int = 100,
     render: bool = False,
@@ -15,10 +125,10 @@ def train_ppo(
     eval_freq: int = 1000000,
     eval_episodes: int = 5,
     # Environment reward parameters
-    food_reward: float = 500.0,
-    death_penalty: float = -100.0,
+    food_reward: float = 700.0,
+    death_penalty: float = -200.0,
     step_reward: float = 2.0,
-    distance_reward: float = 20.0
+    distance_reward: float = 25.0
 ):
     print("=" * 60)
     print("Training Snake with Custom PPO Implementation")
@@ -255,8 +365,7 @@ def main():
     
     if len(sys.argv) == 1:
         # Default training
-        print("Starting default training...")
-        train_ppo()
+        train_by_episodes()
     
     elif sys.argv[1] == "train":
         # Custom training
@@ -267,7 +376,7 @@ def main():
         if render:
             print("Rendering enabled")
         
-        train_ppo(
+        train_by_episodes(
             total_timesteps=timesteps,
             render=render
         )
