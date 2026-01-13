@@ -1,0 +1,55 @@
+# Virtual environments
+**/.venv/
+**/venv/
+**/.env/
+
+# Python
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+**/.Python
+**/pip-log.txt
+**/pip-delete-this-directory.txt
+
+# Jupyter
+**/.ipynb_checkpoints/
+**/*-checkpoint.ipynb
+
+# Model files (large!)
+**/*.pth
+**/*.pt
+**/*.ckpt
+**/*.safetensors
+**/*.bin
+
+# Data files
+**/*.csv
+**/*.json
+**/*.parquet
+**/datasets/
+**/data/
+
+# IDE
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Build
+**/build/
+**/dist/
+**/*.egg-info/
+
+# Logs
+**/*.log
+**/logs/
