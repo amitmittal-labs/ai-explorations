@@ -1,11 +1,20 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+
 [project]
-name = "thinkingmachine"
+name = "thinking-machine"
 version = "0.1.0"
-description = "Add your description here"
-readme = "README.md"
+description = "28M parameter transformer language model"
 requires-python = ">=3.12"
 dependencies = [
-    "streamlit>=1.28.0",
     "torch>=2.0.0",
     "tiktoken>=0.5.0",
+    "streamlit>=1.28.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "datasets>=2.14.0",
+    "jupyter>=1.0.0",
+    "ipykernel>=6.25.0",
 ]
