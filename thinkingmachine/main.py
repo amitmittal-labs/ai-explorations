@@ -5,13 +5,12 @@ import tiktoken
 import math
 import os
 
-# ==========================================
-# 1. CONFIGURATION
-# ==========================================
-# Path to your FIRST model (Pre-trained)
-# Update this path to where your file actually is!
-MODEL_PATH_1 = "./models/pretrained.pth"
-MODEL_PATH_2 = "./models/pretrained_healed_model.pth"
+MODEL_PATHS = {
+    "Pretrained": "./models/pretrain_latest.pth",
+    "SFT": "./models/sft_latest.pth",
+    "GRPO": "./models/grpo_latest.pth"
+}
+
 
 TINY_TM_CONFIG = {
     "vocab_size": 50257,
@@ -24,7 +23,69 @@ TINY_TM_CONFIG = {
 }
 
 # ==========================================
-# 2. MODEL ARCHITECTURE
+# 2. PROMPT TEMPLATES (Matching YOUR Training Data)
+# ==========================================
+PROMPT_TEMPLATES = {
+    "Story Generation": {
+        "template": "{}",
+        "placeholder": "Once upon a time, there was a brave knight",
+        "description": "Natural story continuation (Pretrained on TinyStories)",
+        "best_for": "Pretrained",
+        "trained_on": "TinyStories dataset"
+    },
+    "Alpaca Instruction (SFT)": {
+        "template": "Below is an instruction that describes a task. Write a response that appropriately completes the request.\n\n### Instruction:\n{}\n\n### Response:\n",
+        "placeholder": "Explain how photosynthesis works in simple terms",
+        "description": "EXACT Alpaca format used in SFT training",
+        "best_for": "SFT",
+        "trained_on": "Alpaca dataset (52k instructions)"
+    },
+    "Math Reasoning (GSM8K/GRPO)": {
+        "template": "Question: {}\nSolve step by step.\n<think>\n",
+        "placeholder": "Sarah has 15 apples. She gives 1/3 to her friend and then buys 8 more. How many apples does she have now?",
+        "description": "EXACT GSM8K format with <think> tags (SFT + GRPO)",
+        "best_for": "GRPO",
+        "trained_on": "GSM8K math problems + GRPO optimization"
+    },
+    "OpenOrca Style (SFT)": {
+        "template": "{}\n\n",
+        "placeholder": "You are an AI assistant. User will give you a task. Your goal is to complete the task faithfully.\n\nExplain the water cycle",
+        "description": "System prompt + question format (OpenOrca)",
+        "best_for": "SFT",
+        "trained_on": "OpenOrca dataset (50k samples)"
+    },
+    "Educational Content": {
+        "template": "{}",
+        "placeholder": "The process of evaporation occurs when",
+        "description": "Natural text continuation (Pretrained on FineWeb-edu)",
+        "best_for": "Pretrained",
+        "trained_on": "FineWeb-edu dataset"
+    },
+    "Simple Math (GRPO)": {
+        "template": "Question: {}\nSolve step by step.\n<think>\n",
+        "placeholder": "What is 25 multiplied by 4?",
+        "description": "Simple arithmetic with reasoning (GRPO optimized)",
+        "best_for": "GRPO",
+        "trained_on": "GSM8K with GRPO reinforcement"
+    },
+    "Code Generation (SFT)": {
+        "template": "Below is an instruction that describes a task. Write a response that appropriately completes the request.\n\n### Instruction:\n{}\n\n### Response:\n",
+        "placeholder": "Write a Python function to calculate the factorial of a number",
+        "description": "Programming tasks via Alpaca format",
+        "best_for": "SFT",
+        "trained_on": "Alpaca dataset (includes code tasks)"
+    },
+    "Custom Prompt": {
+        "template": "{}",
+        "placeholder": "Enter your own prompt here",
+        "description": "Use your own custom prompt format",
+        "best_for": "Any",
+        "trained_on": "N/A"
+    }
+}
+
+# ==========================================
+# 3. MODEL ARCHITECTURE
 # ==========================================
 class LayerNorm(nn.Module):
     def __init__(self, emb_dim):
@@ -88,9 +149,6 @@ class ThinkingMachine(nn.Module):
         x = self.blocks(x)
         return self.out_head(self.final_norm(x))
 
-# ==========================================
-# 3. UTILITIES
-# ==========================================
 @st.cache_resource
 def load_resources():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -98,30 +156,38 @@ def load_resources():
     return device, tokenizer
 
 @st.cache_resource
-def load_model(path, device):
-    """Loads a model instance from a specific path."""
-    if not os.path.exists(path):
-        return None, f"Path not found: {path}"
+def load_all_models(device):
+    """Loads all three models and returns them in a dictionary."""
+    models = {}
+    status = {}
+    
+    for name, path in MODEL_PATHS.items():
+        if not os.path.exists(path):
+            models[name] = None
+            status[name] = f"Not found: {path}"
+            continue
+        
+        try:
+            model = ThinkingMachine(TINY_TM_CONFIG).to(device)
+            checkpoint = torch.load(path, map_location=device)
+            state_dict = checkpoint.get('model_state_dict', checkpoint)
+            model.load_state_dict(state_dict, strict=False)
+            model.eval()
+            models[name] = model
+            status[name] = f"Loaded successfully"
+        except Exception as e:
+            models[name] = None
+            status[name] = f"Error: {str(e)[:50]}"
+    
+    return models, status
 
-    model = ThinkingMachine(TINY_TM_CONFIG).to(device)
-    try:
-        checkpoint = torch.load(path, map_location=device)
-        state_dict = checkpoint['model_state_dict'] if 'model_state_dict' in checkpoint else checkpoint
-        model.load_state_dict(state_dict, strict=False)
-        model.eval()
-        return model, "OK"
-    except Exception as e:
-        return None, str(e)
-
-def generate_stream(model, tokenizer, device, prompt, max_tokens, temp, top_k, placeholder):
-    """Generates text and updates a Streamlit placeholder in real-time."""
+def generate_complete(model, tokenizer, device, prompt, max_tokens, temp, top_k):
+    """Generates text and returns the complete result."""
     if model is None:
-        placeholder.error("Model not loaded.")
-        return
+        return "Model not loaded"
 
     input_ids = torch.tensor(tokenizer.encode(prompt)).unsqueeze(0).to(device)
     curr_text = prompt
-      # ID for <|endoftext|>
     eos_id = tokenizer.encode('<|endoftext|>', allowed_special={'<|endoftext|>'})[0]
 
     with torch.no_grad():
@@ -136,71 +202,220 @@ def generate_stream(model, tokenizer, device, prompt, max_tokens, temp, top_k, p
             probs = torch.softmax(logits, dim=-1)
             next_token = torch.multinomial(probs, num_samples=1)
 
-            if next_token.item() == eos_id: break
+            if next_token.item() == eos_id:
+                break
 
             input_ids = torch.cat((input_ids, next_token), dim=1)
             word = tokenizer.decode([next_token.item()])
             curr_text += word
 
-            # Update UI
-            if step % 2 == 0:
-               placeholder.markdown(f"**Generating:**\n{curr_text}")
-
-    placeholder.markdown(f"**Final Output:**\n{curr_text}")
+    return curr_text
 
 # ==========================================
-# 4. STREAMLIT UI LAYOUT
+# 5. STREAMLIT UI LAYOUT
 # ==========================================
-st.set_page_config(layout="wide", page_title="Thinking Machine")
+st.set_page_config(layout="wide", page_title="Thinking Machine Comparison")
 
-st.title("🤖 Thinking Machine Duel")
+st.title("Thinking Machine: Model Comparison Tool")
+st.markdown("Compare **Pretrained**, **SFT**, and **GRPO** models with different prompts")
+
 device, tokenizer = load_resources()
+models, status = load_all_models(device)
 
-# Sidebar Settings
-st.sidebar.header("⚙️ Settings")
-mode = st.sidebar.radio("Comparison Mode", ["Same Prompt (Compare)", "Separate Prompts (Independent)"])
-temp = st.sidebar.slider("Temperature", 0.1, 1.5, 0.8)
-max_len = st.sidebar.slider("Max Tokens", 50, 500, 150)
-
-# Load Models
-col1, col2 = st.columns(2)
-
-with col1:
-    st.subheader("Model 1 (e.g. Pre-trained)")
-    model1, msg1 = load_model(MODEL_PATH_1, device)
-    if model1: st.success(f"Loaded: {os.path.basename(MODEL_PATH_1)}")
-    else: st.error(f"Error: {msg1}")
-
-with col2:
-    st.subheader("Model 2 (e.g. Fine-tuned)")
-    model2, msg2 = load_model(MODEL_PATH_2, device)
-    if model2: st.success(f"Loaded: {os.path.basename(MODEL_PATH_2)}")
-    else: st.error(f"Error: {msg2}")
+# ==========================================
+# TOP SECTION: Model Status
+# ==========================================
+st.subheader("Model Status")
+col_status = st.columns(3)
+for idx, (name, msg) in enumerate(status.items()):
+    with col_status[idx]:
+        if "✅" in msg:
+            st.success(f"**{name}**\n{msg}")
+        else:
+            st.error(f"**{name}**\n{msg}")
 
 st.markdown("---")
 
-# Input Area
-if mode == "Same Prompt (Compare)":
-    common_prompt = st.text_area("Enter Prompt for BOTH models:", height=100, value="Once upon a time")
-    if st.button("🚀 Generate Both"):
-        c1, c2 = st.columns(2)
-        with c1:
-            box1 = st.empty()
-            generate_stream(model1, tokenizer, device, common_prompt, max_len, temp, 40, box1)
-        with c2:
-            box2 = st.empty()
-            generate_stream(model2, tokenizer, device, common_prompt, max_len, temp, 40, box2)
+# ==========================================
+# CONFIGURATION SECTION
+# ==========================================
+st.subheader("Configuration")
 
-else: # Independent Mode
-    c1, c2 = st.columns(2)
-    with c1:
-        prompt1 = st.text_area("Prompt for Model 1:", height=100, value="Once upon a time")
-        if st.button("Generate Model 1"):
-            box1 = st.empty()
-            generate_stream(model1, tokenizer, device, prompt1, max_len, temp, 40, box1)
+config_col1, config_col2 = st.columns([2, 1])
 
-    with c2:
-        prompt2 = st.text_area("Prompt for Model 2:", height=100, value="Question: 2+2? <think>")
-        if st.button("Generate Model 2"):
-            box2 = st.empty()
-            generate_stream(model2, tokenizer, device, prompt2, max_len, temp, 40, box2)
+with config_col1:
+    # Template Selection
+    template_choice = st.selectbox(
+        "Select Prompt Template:",
+        list(PROMPT_TEMPLATES.keys()),
+        help="Choose a template that matches your use case"
+    )
+    
+    template_info = PROMPT_TEMPLATES[template_choice]
+    
+    # Show template info
+    st.info(f"**Description:** {template_info['description']}\n\n**Best for:** {template_info['best_for']}\n\n**Trained on:** {template_info['trained_on']}")
+
+with config_col2:
+    # Model Selection
+    st.markdown("**Select Models to Run:**")
+    
+    run_pretrained = st.checkbox("Pretrained", value=True, disabled=models["Pretrained"] is None)
+    run_sft = st.checkbox("SFT", value=True, disabled=models["SFT"] is None)
+    run_grpo = st.checkbox("GRPO", value=True, disabled=models["GRPO"] is None)
+    
+    # Generation Settings
+    st.markdown("**Generation Settings:**")
+    temp = st.slider("Temperature", 0.1, 2.0, 0.8, 0.1, help="Higher = more creative")
+    max_len = st.slider("Max Tokens", 50, 500, 200, 10)
+    top_k = st.slider("Top-K", 1, 100, 40, 1, help="Limits sampling to top K tokens")
+
+st.markdown("---")
+
+# ==========================================
+# PROMPT INPUT SECTION
+# ==========================================
+st.subheader("✏️ Enter Your Prompt")
+
+if template_choice == "Custom Prompt":
+    user_input = st.text_area(
+        "Custom Prompt:",
+        height=150,
+        value=template_info['placeholder'],
+        help="Enter any custom prompt",
+        key="user_input"
+    )
+    final_prompt = user_input
+else:
+    user_input = st.text_area(
+        f"Fill in the template:",
+        height=120,
+        value=template_info['placeholder'],
+        help=f"This will be inserted into the template below",
+        key="user_input"
+    )
+    final_prompt = template_info['template'].format(user_input)
+    
+    # Show formatted prompt
+    with st.expander("🔍 Preview Full Prompt (What models will see)"):
+        st.code(final_prompt, language="text")
+        st.caption(f"Template: `{template_info['template'][:80]}...`")
+
+# Generate Button
+generate_button = st.button("Generate Responses", type="primary", use_container_width=True)
+
+st.markdown("---")
+
+# ==========================================
+# RESULTS SECTION - TABBED VIEW
+# ==========================================
+if generate_button:
+    st.subheader("Generated Responses")
+    
+    # Determine which models to run
+    models_to_run = []
+    if run_pretrained and models["Pretrained"]: models_to_run.append("Pretrained")
+    if run_sft and models["SFT"]: models_to_run.append("SFT")
+    if run_grpo and models["GRPO"]: models_to_run.append("GRPO")
+    
+    if not models_to_run:
+        st.warning("Please select at least one model to run!")
+    else:
+        # Create tabs for each selected model
+        tabs = st.tabs([f"{name}" for name in models_to_run])
+        
+        # Generate for each model in its own tab
+        for idx, model_name in enumerate(models_to_run):
+            with tabs[idx]:
+                with st.spinner(f"Generating with {model_name}..."):
+                    result = generate_complete(
+                        models[model_name], 
+                        tokenizer, 
+                        device, 
+                        final_prompt, 
+                        max_len, 
+                        temp, 
+                        top_k
+                    )
+                
+                # Display results in larger text areas
+                st.markdown(f"### Input Prompt")
+                st.text_area(
+                    "Prompt sent to model:",
+                    value=final_prompt,
+                    height=150,
+                    key=f"prompt_{model_name}",
+                    disabled=True
+                )
+                
+                st.markdown(f"### Generated Output")
+                generated_only = result[len(final_prompt):]
+                st.text_area(
+                    "Generated text:",
+                    value=generated_only,
+                    height=300,
+                    key=f"output_{model_name}",
+                    disabled=True
+                )
+                
+                st.markdown(f"### Complete Response")
+                st.text_area(
+                    "Full response (prompt + generated):",
+                    value=result,
+                    height=400,
+                    key=f"complete_{model_name}",
+                    disabled=True
+                )
+                
+                # Token count
+                token_count = len(tokenizer.encode(generated_only))
+                st.caption(f"Generated {token_count} tokens")
+
+# ==========================================
+# SIDEBAR - HELP & EXAMPLES
+# ==========================================
+with st.sidebar:
+    st.header("ℹModel Information")
+    st.markdown("""
+    **Pretrained:**
+    - Trained on TinyStories + FineWeb-edu
+    - Good at: Story generation, text completion
+    - No instruction following
+    
+    **SFT (Supervised Fine-Tuning):**
+    - Trained on: Alpaca (52k) + GSM8K + OpenOrca (50k)
+    - Good at: Following instructions, Q&A, code
+    - Formats: `### Instruction:` and `Question: ... <think>`
+    
+    **GRPO (Reinforcement Learning):**
+    - Optimized on GSM8K math reasoning
+    - Good at: Step-by-step thinking, math problems
+    - Uses `<think>` tags for chain-of-thought
+    """)
+    
+    st.markdown("---")
+    
+    with st.expander("💡 Example Prompts"):
+        st.markdown("""
+        ### For Pretrained:
+        **Template:** Story Generation
+        - "Once upon a time, in a magical forest there lived"
+        - "The young scientist discovered that water"
+        
+        ### For SFT:
+        **Template:** Alpaca Instruction
+        - "Write a short poem about nature"
+        - "Explain photosynthesis in simple terms"
+        
+        ### For GRPO:
+        **Template:** Math Reasoning
+        - "A store sells apples for $0.50 each. If you buy 12 apples and pay with a $10 bill, how much change do you get?"
+        - "John has 3 times as many marbles as Sarah. Together they have 48 marbles. How many does John have?"
+        """)
+    
+    st.markdown("---")
+    st.markdown("""
+    <div style='text-align: center; color: #666;'>
+    <small>Thinking Machine v1.0</small>
+    </div>
+    """, unsafe_allow_html=True)
